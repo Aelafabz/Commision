@@ -1,12 +1,5 @@
-"""
-Automate Physician Performance Excel export from Abronal eHealth.
-
-Flow: ask dates -> login -> select role -> open report -> for each physician:
-      set filters -> search -> Excel
-
-OOP rewrite. See CONVERSION_MANUAL.md for the design notes and how to extend
-this safely.
-"""
+"""Flow: ask dates -> login -> select role -> open report -> for each physician:
+      set filters -> search -> Excel"""
 from __future__ import annotations
 
 import argparse
@@ -15,17 +8,20 @@ import logging
 import re
 import subprocess
 import sys
+import os
 import tkinter as tk
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tkinter import messagebox, ttk
-from dotenv import env
+from dotenv import load_dotenv
 
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
+
+from secret_helper import get_secret
 
 # Directory containing this script. (Fixed from the original
 # `Path(__file__).resolve().parent[1]`, which is not valid — `.parent` is a
@@ -34,7 +30,8 @@ from playwright.sync_api import sync_playwright
 load_dotenv()
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_CONFIG = SCRIPT_DIR / "config.json"
+ROOT_DIR = SCRIPT_DIR.parent
+DEFAULT_CONFIG = ROOT_DIR/ "configs" / "config.json"
 
 
 # --------------------------------------------------------------------------
@@ -89,7 +86,7 @@ class AppConfig:
     original defaults preserved. Use `variant()` to get a modified copy
     written to a temp file (used by --headed)."""
 
-    DEFAULT_ANALYZER_SCRIPT = r"C:\Users\senay\Desktop\dr master analyzer\reconciliation_app_v5.py"
+    DEFAULT_ANALYZER_SCRIPT = SCRIPT_DIR/"reconciliation_app_v5.py"
 
     def __init__(self, path: Path, data: dict | None = None):
         self.path = path
@@ -250,7 +247,7 @@ class OutputPaths:
 
     def __init__(self, date_range: DateRange, desktop: Path | None = None):
         self.date_range = date_range
-        self.desktop = desktop or (Path.home() / "Desktop")
+        self.desktop = ROOT_DIR / "data raw"
         self.label = date_range.label()
         self.root = self.desktop / self.label
         self.abronal = self.root / f"{self.label} abronal"

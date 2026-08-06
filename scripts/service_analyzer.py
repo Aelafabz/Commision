@@ -1,10 +1,25 @@
+import json
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import os
 
-# ── Default category mapping ─────────────────────────────────────
-DEFAULT_CATEGORIES = {
+# ── Dictionary loading / category mapping ─────────────────────────
+DICTIONARY_PATH = Path(__file__).resolve().parent.parent / "configs" / "dictionary.json"
+
+
+def load_service_dictionary(path: Path | str | None = None) -> dict[str, str]:
+    path = Path(path) if path is not None else DICTIONARY_PATH
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return {str(k): str(v) for k, v in data.items() if k is not None}
+    except Exception:
+        return {}
+
+
+BUILTIN_DEFAULT_CATEGORIES = {
     "25-OH-Vitamin D": "Laboratory",
     "AFB": "Laboratory",
     "ALP": "Laboratory",
@@ -89,6 +104,7 @@ DEFAULT_CATEGORIES = {
     "Consultancy of Internist Card": "Consultation",
 }
 
+DEFAULT_CATEGORIES = {**BUILTIN_DEFAULT_CATEGORIES, **load_service_dictionary()}
 # ── Desired column order in output ────────────────────────────────
 COLUMN_ORDER = [
     "Consultation",
@@ -108,6 +124,37 @@ def reorder_columns(pivot):
     extras = [c for c in pivot.columns if c not in COLUMN_ORDER and c != "TOTAL"]
     total = ["TOTAL"] if "TOTAL" in pivot.columns else []
     return pivot[ordered + extras + total]
+
+
+class Condensor:
+    """Condense a service dataset into category totals using the shared dictionary."""
+
+    def __init__(self, dictionary_path: Path | str | None = None):
+        self.dictionary = load_service_dictionary(dictionary_path)
+        self._data = None
+
+    def read_dictionary(self, dictionary_path: Path | str | None = None) -> dict[str, str]:
+        return load_service_dictionary(dictionary_path or self.dictionary)
+
+    def load_data(self, df: pd.DataFrame, service_column: str = "Service", amount_column: str = "Amount", patient_column: str = "Patient Name") -> pd.DataFrame:
+        if df is None or df.empty:
+            return pd.DataFrame(columns=[patient_column, service_column, amount_column, "Category"])
+        self._data = df.copy()
+        self._data["Category"] = self._data[service_column].map(self.dictionary).fillna("Other")
+        return self._data
+
+    def list_condensor(self) -> pd.DataFrame:
+        if self._data is None or self._data.empty:
+            return pd.DataFrame()
+        condensed = self._data.groupby(["Patient Name", "Category"])["Amount"].sum().reset_index()
+        pivot = condensed.pivot_table(
+            index="Patient Name",
+            columns="Category",
+            values="Amount",
+            aggfunc="sum",
+            fill_value=0,
+        )
+        return reorder_columns(pivot)
 
 
 class App:
