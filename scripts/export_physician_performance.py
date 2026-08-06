@@ -86,7 +86,7 @@ class AppConfig:
     original defaults preserved. Use `variant()` to get a modified copy
     written to a temp file (used by --headed)."""
 
-    DEFAULT_ANALYZER_SCRIPT = r"C:\Users\senay\Desktop\dr master analyzer\reconciliation_app_v5.py"
+    DEFAULT_ANALYZER_SCRIPT = SCRIPT_DIR/"reconciliation_app_v5.py"
 
     def __init__(self, path: Path, data: dict | None = None):
         self.path = path
@@ -247,7 +247,7 @@ class OutputPaths:
 
     def __init__(self, date_range: DateRange, desktop: Path | None = None):
         self.date_range = date_range
-        self.desktop = desktop or (Path.home() / "Desktop")
+        self.desktop = ROOT_DIR / "data raw"
         self.label = date_range.label()
         self.root = self.desktop / self.label
         self.abronal = self.root / f"{self.label} abronal"

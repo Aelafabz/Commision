@@ -1,0 +1,549 @@
+{
+  "count": 136,
+  "services": [
+    {
+      "service": "25-OH-Vitamin D",
+      "category": "Laboratory"
+    },
+    {
+      "service": "2PPG",
+      "category": "Laboratory"
+    },
+    {
+      "service": "AFB",
+      "category": "Laboratory"
+    },
+    {
+      "service": "ALP",
+      "category": "Laboratory"
+    },
+    {
+      "service": "ASO",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Abdomen Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Abdominal + Pelvic Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Abscess Drainage (Big)",
+      "category": "Other"
+    },
+    {
+      "service": "Abscess Drainage -medium",
+      "category": "Other"
+    },
+    {
+      "service": "Ankle joint left",
+      "category": "Other"
+    },
+    {
+      "service": "Ankle joint right",
+      "category": "Other"
+    },
+    {
+      "service": "Anti-HCV Ab",
+      "category": "Laboratory"
+    },
+    {
+      "service": "BUN",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Bilirubin (D)",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Bilirubin (T)",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Blood Film",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Blood Group",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Both Breast US",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Breast left",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Breast right",
+      "category": "Other"
+    },
+    {
+      "service": "CBC",
+      "category": "Laboratory"
+    },
+    {
+      "service": "CRP Quantitative",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Calcaneus X-ray Right",
+      "category": "X-ray"
+    },
+    {
+      "service": "Cervical Spine X-ray",
+      "category": "X-ray"
+    },
+    {
+      "service": "Chest Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Chest X-ray Oblique Right",
+      "category": "X-ray"
+    },
+    {
+      "service": "Chest X-ray PA",
+      "category": "X-ray"
+    },
+    {
+      "service": "Cholesterol",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Consultancy of Cardiologist",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Endocronlogist",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of GP Card",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Gastroenterologist and Hepatologist",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of General and Vascular Surgeon",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Internist Card",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Internist, Endocrinologist",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Internist, Pulmonologist",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Nephrologist",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Neurology Card",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Pediatrician Card",
+      "category": "Consultation"
+    },
+    {
+      "service": "Consultancy of Urologist Card",
+      "category": "Consultation"
+    },
+    {
+      "service": "Creatinine",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Death Care",
+      "category": "Other"
+    },
+    {
+      "service": "Diabetic foot assesment,basic",
+      "category": "Other"
+    },
+    {
+      "service": "Diabetic foot assessment",
+      "category": "Other"
+    },
+    {
+      "service": "Doppler Study Arteries and Vain Right leg",
+      "category": "Other"
+    },
+    {
+      "service": "Doppler studies of artery and vein in both legs",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Doppler study of arteries right leg",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Doppler study of veins left leg",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "ECG",
+      "category": "ECG"
+    },
+    {
+      "service": "ESR",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Echocardiography",
+      "category": "Echocardiography"
+    },
+    {
+      "service": "Electrolyte Panel",
+      "category": "Laboratory"
+    },
+    {
+      "service": "FBS",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Femural Bone X-ray Left",
+      "category": "Other"
+    },
+    {
+      "service": "Femural Bone X-ray Right",
+      "category": "Other"
+    },
+    {
+      "service": "Finger X-ray Right",
+      "category": "Other"
+    },
+    {
+      "service": "Foot Ultrasound Right",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Foot X-ray Left",
+      "category": "X-ray"
+    },
+    {
+      "service": "Foot X-ray Right",
+      "category": "X-ray"
+    },
+    {
+      "service": "Free T3",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Free T4",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Gram Stain",
+      "category": "Laboratory"
+    },
+    {
+      "service": "H.pylori AG",
+      "category": "Laboratory"
+    },
+    {
+      "service": "H.pylori Ab",
+      "category": "Laboratory"
+    },
+    {
+      "service": "HBsAg",
+      "category": "Laboratory"
+    },
+    {
+      "service": "HCG",
+      "category": "Laboratory"
+    },
+    {
+      "service": "HDL",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Hand Ultrasound Right",
+      "category": "Other"
+    },
+    {
+      "service": "Hand X-ray Both",
+      "category": "Other"
+    },
+    {
+      "service": "Hand X-ray Left",
+      "category": "Other"
+    },
+    {
+      "service": "Hand X-ray Right",
+      "category": "X-ray"
+    },
+    {
+      "service": "HbA1c",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Home service - laboratory blood draw",
+      "category": "Other"
+    },
+    {
+      "service": "Humerus (Upper Arm) right - X-ray",
+      "category": "X-ray"
+    },
+    {
+      "service": "IM injection",
+      "category": "Nursing & Procedures"
+    },
+    {
+      "service": "INR",
+      "category": "Laboratory"
+    },
+    {
+      "service": "IP - Disposable Glove pair",
+      "category": "Supplies"
+    },
+    {
+      "service": "IP - Dressing Small (300)",
+      "category": "Other"
+    },
+    {
+      "service": "IP - Ear Irrigation Single",
+      "category": "Other"
+    },
+    {
+      "service": "IV injection",
+      "category": "Nursing & Procedures"
+    },
+    {
+      "service": "Joint Injection",
+      "category": "Other"
+    },
+    {
+      "service": "KOH",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Knee joint left X-ray",
+      "category": "X-ray"
+    },
+    {
+      "service": "Knee joint right X-ray",
+      "category": "X-ray"
+    },
+    {
+      "service": "Knee left Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Knee right Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "LDL",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Lower leg (Tibial and Fibular) Bone X-ray Left",
+      "category": "Other"
+    },
+    {
+      "service": "Lower leg (Tibial and Fibular) Bone X-ray Right",
+      "category": "Other"
+    },
+    {
+      "service": "Lumbo sacral spine x-ray",
+      "category": "X-ray"
+    },
+    {
+      "service": "Neck Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "OM of the great toe major debridment",
+      "category": "Other"
+    },
+    {
+      "service": "Observation",
+      "category": "Nursing & Procedures"
+    },
+    {
+      "service": "Obstetric Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Occult Blood",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Oxygen per hour",
+      "category": "Nursing & Procedures"
+    },
+    {
+      "service": "PSA",
+      "category": "Laboratory"
+    },
+    {
+      "service": "PT",
+      "category": "Laboratory"
+    },
+    {
+      "service": "PTT",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Pelvic / Prostate Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Pelvic X-ray",
+      "category": "X-ray"
+    },
+    {
+      "service": "Pelvic bone (hip joint) left",
+      "category": "X-ray"
+    },
+    {
+      "service": "Pelvic bone (hip joint) right",
+      "category": "X-ray"
+    },
+    {
+      "service": "Physiotherapy Per Day",
+      "category": "Other"
+    },
+    {
+      "service": "RBS",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Rheumatoid Factor (RF)",
+      "category": "Laboratory"
+    },
+    {
+      "service": "SGOT",
+      "category": "Laboratory"
+    },
+    {
+      "service": "SGPT",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Scrotal Ultrasound",
+      "category": "Other"
+    },
+    {
+      "service": "Serum Albumin",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Shoulder Ultrasound Left",
+      "category": "Other"
+    },
+    {
+      "service": "Shoulder Ultrasound Right",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Shoulder X-ray Right",
+      "category": "X-ray"
+    },
+    {
+      "service": "Stool Concentration",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Stool Exam",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Syringe 10cc",
+      "category": "Other"
+    },
+    {
+      "service": "T4",
+      "category": "Laboratory"
+    },
+    {
+      "service": "TSH",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Testes Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Testosterone",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Thyroid Ultrasound",
+      "category": "Ultrasound"
+    },
+    {
+      "service": "Total Protein",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Triglyceride (TG)",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Troponin",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Uric Acid",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Urinalysis",
+      "category": "Laboratory"
+    },
+    {
+      "service": "VDRL",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Vitamin B12",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Weil Felix",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Wet Film",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Widal",
+      "category": "Laboratory"
+    },
+    {
+      "service": "Wrist Joint X-ray Left",
+      "category": "Other"
+    },
+    {
+      "service": "Wrist Joint X-ray Right",
+      "category": "X-ray"
+    },
+    {
+      "service": "eye lid mass",
+      "category": "Other"
+    },
+    {
+      "service": "face laceration repair",
+      "category": "Other"
+    },
+    {
+      "service": "toe mass excision",
+      "category": "Other"
+    }
+  ]
+}
