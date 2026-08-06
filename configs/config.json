@@ -12,5 +12,6 @@
   "headless": true,
   "launch_analyzer": true,
   "analyzer_auto_run": true,
-  "analyzer_script": "C:\\Users\\senay\\Desktop\\dr master analyzer\\reconciliation_app_v5.py"
+  "analyzer_script": "scripts/reconciliation_app_v5.py",
+  "pipeline_script": "scripts/run_pipeline.py"
 }
