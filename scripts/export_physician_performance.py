@@ -1,12 +1,5 @@
-"""
-Automate Physician Performance Excel export from Abronal eHealth.
-
-Flow: ask dates -> login -> select role -> open report -> for each physician:
-      set filters -> search -> Excel
-
-OOP rewrite. See CONVERSION_MANUAL.md for the design notes and how to extend
-this safely.
-"""
+"""Flow: ask dates -> login -> select role -> open report -> for each physician:
+      set filters -> search -> Excel"""
 from __future__ import annotations
 
 import argparse
@@ -15,17 +8,20 @@ import logging
 import re
 import subprocess
 import sys
+import os
 import tkinter as tk
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tkinter import messagebox, ttk
-from dotenv import env
+from dotenv import load_dotenv
 
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
+
+from secret_helper import get_secret
 
 # Directory containing this script. (Fixed from the original
 # `Path(__file__).resolve().parent[1]`, which is not valid — `.parent` is a
@@ -34,7 +30,8 @@ from playwright.sync_api import sync_playwright
 load_dotenv()
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_CONFIG = SCRIPT_DIR / "config.json"
+ROOT_DIR = SCRIPT_DIR.parent
+DEFAULT_CONFIG = ROOT_DIR/ "configs" / "config.json"
 
 
 # --------------------------------------------------------------------------
