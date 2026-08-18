@@ -1,3 +1,5 @@
+import sqlite3
+from datetime import date, datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
@@ -5,6 +7,7 @@ import os
 import re
 import json
 import threading
+from pathlib import Path
 from difflib import get_close_matches, SequenceMatcher
 
 try:
@@ -15,6 +18,8 @@ except Exception:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SAVED_CATEGORIES_PATH = os.path.join(SCRIPT_DIR, "saved_service_categories.json")
 LAST_SERVICES_PATH = os.path.join(SCRIPT_DIR, "last_services_seen.json")
+DATABASE_PATH = Path(__file__).resolve().parent.parent / "database" / "commission.db"
+DEFAULT_COMMISSION_RATE = 0.10
 
 COLUMN_ORDER = [
     "Consultation",
@@ -115,6 +120,135 @@ def find_perfect_matches_file(output_dir, date_label=None):
             if lower.endswith(".xlsx") and "perfect" in lower and "match" in lower:
                 return os.path.join(output_dir, filename)
     return preferred
+
+
+def _ensure_db_schema(db_path: Path) -> None:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doctor_name TEXT NOT NULL,
+                service TEXT NOT NULL,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL,
+                date TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_records_unique ON records(doctor_name, service, amount, category, date)"
+        )
+
+
+def _normalize_db_date(value):
+    if value is None:
+        return ""
+    if isinstance(value, (pd.Timestamp, datetime, date)):
+        return value.isoformat()
+    try:
+        parsed = pd.to_datetime(value, errors='coerce')
+        if pd.notna(parsed):
+            return parsed.isoformat()
+    except Exception:
+        pass
+    return str(value)
+
+
+def save_perfect_matches_to_db(perfect_matches, service_category_map, db_path: Path | None = None, log_fn=None) -> int:
+    db_path = Path(db_path) if db_path is not None else DATABASE_PATH
+    _ensure_db_schema(db_path)
+    inserted = 0
+    with sqlite3.connect(db_path) as conn:
+        for item in perfect_matches:
+            service = item['abr'].get('Original_Service', '')
+            category = service_category_map.get(service, 'Other')
+            record_date = item['sot'].get('Date') if item['sot'].get('Date') is not None else item['abr'].get('Date')
+            conn.execute(
+                "INSERT OR IGNORE INTO records (doctor_name, service, amount, category, date) VALUES (?, ?, ?, ?, ?)",
+                (
+                    item['abr'].get('Original_Name', ''),
+                    service,
+                    float(item['abr'].get('Amount', 0)),
+                    category,
+                    _normalize_db_date(record_date),
+                ),
+            )
+            inserted += 1
+    if log_fn:
+        log_fn(f"  Persisted {inserted} perfect-match record(s) to database: {db_path}")
+    return inserted
+
+
+def build_commission_summary(perfect, service_category_map, date_label, commission_rate=DEFAULT_COMMISSION_RATE) -> pd.DataFrame:
+    if not perfect:
+        return pd.DataFrame(columns=['Patient Name', 'TOTAL', 'Commission %', 'Commission Amount', 'Date Range'])
+
+    rows = []
+    for item in perfect:
+        service = item['abr'].get('Original_Service', '')
+        category = service_category_map.get(service, 'Other')
+        date_val = item['sot'].get('Date') if item['sot'].get('Date') is not None else item['abr'].get('Date')
+        rows.append({
+            'Patient Name': item['abr'].get('Original_Name', ''),
+            'Service': service,
+            'Category': category,
+            'Amount': float(item['abr'].get('Amount', 0)),
+            'Date': pd.to_datetime(date_val, errors='coerce'),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame()
+
+    df['Category'] = df['Category'].fillna('Other')
+    pivot = df.pivot_table(
+        index='Patient Name',
+        columns='Category',
+        values='Amount',
+        aggfunc='sum',
+        fill_value=0,
+    ).reset_index()
+    category_columns = [c for c in COLUMN_ORDER if c in pivot.columns]
+    extras = [c for c in pivot.columns if c not in ('Patient Name',) + tuple(COLUMN_ORDER)]
+    ordered_columns = ['Patient Name'] + category_columns + sorted(extras)
+    pivot = pivot.reindex(columns=ordered_columns)
+    pivot['TOTAL'] = pivot[[c for c in pivot.columns if c not in ('Patient Name',)]].sum(axis=1)
+    pivot['Date Range'] = date_label or ''
+    pivot['Commission %'] = f"{commission_rate * 100:.1f}%"
+    pivot['Commission Amount'] = pivot['TOTAL'] * commission_rate
+    return pivot
+
+
+def save_commission_summary(perfect, service_category_map, output_dir, date_label, commission_rate=DEFAULT_COMMISSION_RATE, log_fn=None) -> str:
+    summary_df = build_commission_summary(perfect, service_category_map, date_label, commission_rate)
+    output_path = os.path.join(output_dir, 'Commission_Summary.xlsx')
+    if summary_df.empty:
+        if log_fn:
+            log_fn('  No perfect matches found to build commission summary.')
+        return output_path
+
+    raw_rows = []
+    for item in perfect:
+        raw_rows.append({
+            'Patient Name': item['abr'].get('Original_Name', ''),
+            'Service': item['abr'].get('Original_Service', ''),
+            'Category': service_category_map.get(item['abr'].get('Original_Service', ''), 'Other'),
+            'Amount': item['abr'].get('Amount', 0),
+            'Abronal Date': item['abr'].get('Original_Timestamp', ''),
+            'SoT Date': item['sot'].get('Date', ''),
+        })
+
+    raw_df = pd.DataFrame(raw_rows)
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        summary_df.to_excel(writer, sheet_name='Physician Totals', index=False)
+        raw_df.to_excel(writer, sheet_name='Service Totals', index=False)
+
+    if log_fn:
+        log_fn(f'  Commission summary saved: {output_path}')
+    return output_path
+
 
 # ── Core Logic ──────────────────────────────────────────────────────────────
 
@@ -266,23 +400,45 @@ def load_abr(abr_dir, log_fn):
                 except: continue
     return all_abr
 
-def run_summary_logic(perfect_xlsx_path, output_dir, log_fn):
+def run_summary_logic(perfect_xlsx_path, output_dir, log_fn, date_label=None, commission_rate=DEFAULT_COMMISSION_RATE):
     log_fn("── Generating Service Summary Report ──")
     try:
         xl = pd.ExcelFile(perfect_xlsx_path)
         all_summaries = []
+        perfect_rows = []
         for sheet_name in xl.sheet_names:
             df = pd.read_excel(xl, sheet_name)
             if not df.empty:
                 summary = df.groupby('Service')['Amount'].agg(['sum', 'count']).reset_index()
                 summary.insert(0, 'Staff Member', sheet_name)
                 all_summaries.append(summary)
+                df['Abronal Source'] = sheet_name
+                perfect_rows.append(df)
         if all_summaries:
             final_summary = pd.concat(all_summaries)
             final_summary.columns = ['Staff Member', 'Service', 'Total Amount', 'Transaction Count']
             summary_path = os.path.join(output_dir, "Service_Summary_Report.xlsx")
             final_summary.to_excel(summary_path, index=False)
             log_fn(f"  Summary saved: {summary_path}")
+            if date_label is None:
+                date_label = infer_date_label(output_dir)
+            service_category_map = known_category_map()
+            if perfect_rows:
+                perfect_df = pd.concat(perfect_rows, ignore_index=True)
+                perfect_items = []
+                for _, row in perfect_df.iterrows():
+                    perfect_items.append({
+                        'abr': {
+                            'Original_Name': row.get('Patient Name', ''),
+                            'Original_Service': row.get('Service', ''),
+                            'Amount': float(row.get('Amount', 0)),
+                            'Original_Timestamp': row.get('Abronal Date', ''),
+                        },
+                        'sot': {
+                            'Date': row.get('SoT Date'),
+                        },
+                    })
+                save_commission_summary(perfect_items, service_category_map, output_dir, date_label, commission_rate, log_fn=log_fn)
             return True
     except Exception as e:
             log_fn(f"  Summary Error: {e}")
@@ -379,7 +535,7 @@ def build_audit_report(all_abr, all_sot, nameless_sot_pool, perfect, mismatch, s
 
     return audit_df, pd.DataFrame(summary_rows), status_counts, pd.DataFrame(exceptions, columns=['Issue', 'Row ID'])
 
-def run_reconciliation(abr_dir, sot_dir, output_dir, log_fn, done_fn, review_services_fn=None, date_label=None):
+def run_reconciliation(abr_dir, sot_dir, output_dir, log_fn, done_fn, review_services_fn=None, date_label=None, commission_rate=DEFAULT_COMMISSION_RATE, persist_db=True):
     try:
         date_label = (date_label or "").strip() or infer_date_label(output_dir, abr_dir, sot_dir)
         if date_label:
@@ -649,7 +805,9 @@ def run_reconciliation(abr_dir, sot_dir, output_dir, log_fn, done_fn, review_ser
             pd.DataFrame(blind_output).to_excel(os.path.join(output_dir, "Blind_Matches.xlsx"), index=False)
         if remaining_nameless: pd.DataFrame([raw_with_row_id(n) for n in remaining_nameless]).to_excel(os.path.join(output_dir, "Nameless_SoT_Records.xlsx"), index=False)
         
-        run_summary_logic(pm_path, output_dir, log_fn)
+        run_summary_logic(pm_path, output_dir, log_fn, date_label=date_label, commission_rate=commission_rate)
+        if persist_db:
+            save_perfect_matches_to_db(perfect, service_category_map, db_path=DATABASE_PATH, log_fn=log_fn)
 
         log_fn("\n═══════════════════════════════════════")
         log_fn("  RECONCILIATION COMPLETE")
@@ -659,11 +817,13 @@ def run_reconciliation(abr_dir, sot_dir, output_dir, log_fn, done_fn, review_ser
         log_fn(f"\nERROR: {e}"); done_fn(False)
 
 class ReconciliationApp:
-    def __init__(self, root, abr_dir=None, sot_dir=None, out_dir=None, auto_run=False, date_label=None):
+    def __init__(self, root, abr_dir=None, sot_dir=None, out_dir=None, auto_run=False, date_label=None, commission_rate=DEFAULT_COMMISSION_RATE, persist_db=True):
         self.root = root; self.root.title("Transaction Reconciliation Tool v5"); self.root.geometry("1100x720")
         self.perfect_df = pd.DataFrame()
         self._auto_run = bool(auto_run)
         self.date_label = (date_label or "").strip() or infer_date_label(out_dir, abr_dir, sot_dir)
+        self.commission_rate = float(commission_rate)
+        self.persist_db = bool(persist_db)
         notebook = ttk.Notebook(root); notebook.pack(fill="both", expand=True, padx=5, pady=5)
         self.notebook = notebook
 
@@ -985,7 +1145,7 @@ class ReconciliationApp:
         self.date_label = label
         threading.Thread(
             target=run_reconciliation,
-            args=(abr, sot, out, self.log, self._on_done, self.review_services_before_save, label),
+            args=(abr, sot, out, self.log, self._on_done, self.review_services_before_save, label, self.commission_rate, self.persist_db),
             daemon=True,
         ).start()
 
@@ -1032,6 +1192,17 @@ if __name__ == "__main__":
         help='Date range label for output names, e.g. "July 20 to July 22"',
     )
     parser.add_argument(
+        "--commission-rate",
+        type=float,
+        default=DEFAULT_COMMISSION_RATE,
+        help="Commission rate as a decimal number, e.g. 0.1 for 10 percent.",
+    )
+    parser.add_argument(
+        "--skip-db",
+        action="store_true",
+        help="Do not persist perfect-match records to the local commission database.",
+    )
+    parser.add_argument(
         "--auto-run",
         action="store_true",
         help="Start reconciliation automatically after the window opens",
@@ -1046,5 +1217,7 @@ if __name__ == "__main__":
         out_dir=args.out,
         auto_run=args.auto_run,
         date_label=args.date_label,
+        commission_rate=args.commission_rate,
+        persist_db=not args.skip_db,
     )
     root.mainloop()

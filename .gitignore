@@ -1,1 +1,10 @@
 .env
+*.log
+*.pyc
+*.zip
+test_secret_helper.py
+*.xlsx
+*.xls
+*.db
+*.txt
+*.xlsx#
