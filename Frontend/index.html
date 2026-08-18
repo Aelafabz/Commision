@@ -49,6 +49,20 @@
           </tbody>
         </table>
       </section>
+            <section class="panel">
+        <h2>Reconciliation Pipeline</h2>
+        <form id="pipeline-form" class="form">
+          <label>Abronal folder <input id="abrDir" type="text" required /></label>
+          <label>SoT folder <input id="sotDir" type="text" required /></label>
+          <label>Date label <input id="dateLabel" type="text" placeholder="July 20 to July 22" /></label>
+          <button id="pipeline-btn" type="submit">Run Pipeline</button>
+        </form>
+        <p id="pipeline-status" class="status"></p>
+        <table>
+          <thead><tr id="pipeline-head"></tr></thead>
+          <tbody id="pipeline-body"><tr><td>No run yet.</td></tr></tbody>
+        </table>
+      </section>
     </main>
 
     <script src="app.js"></script>
