@@ -4,14 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Commission Dashboard</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app">
       <section class="panel">
         <h1>Commission Export Control</h1>
-        <p>Use this form to send export dates and physician names to the PHP backend, avoiding the Tkinter date picker.</p>
-
+        
         <form id="export-form" class="form">
           <label>
             From date
@@ -22,7 +21,7 @@
             <input id="toDate" type="date" required />
           </label>
           <label>
-            Physicians (comma-separated)
+            Physicians
             <input id="physicians" type="text" placeholder="Dr. Ahmed, Dr. Sara" />
           </label>
           <button id="submit-btn" type="submit">Start export</button>
@@ -52,6 +51,6 @@
       </section>
     </main>
 
-    <script src="/app.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>

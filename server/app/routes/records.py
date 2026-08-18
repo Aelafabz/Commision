@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
@@ -16,7 +16,7 @@ def get_db():
         db.close()
 
 
-@router.post("/", response_model=RecordRead)
+@router.post("", response_model=RecordRead)
 def create_record(payload: RecordCreate, db: Session = Depends(get_db)) -> RecordRead:
     record = Record(**payload.model_dump())
     db.add(record)
@@ -25,14 +25,14 @@ def create_record(payload: RecordCreate, db: Session = Depends(get_db)) -> Recor
     return record
 
 
-@router.get("/", response_model=list[RecordRead])
+@router.get("", response_model=list[RecordRead])
 def list_records(db: Session = Depends(get_db)) -> list[RecordRead]:
-    return db.query(Record).all()
+    return db.query(Record).order_by(Record.date.desc()).all()
 
 
 @router.get("/{record_id}", response_model=RecordRead)
 def get_record(record_id: int, db: Session = Depends(get_db)) -> RecordRead:
     record = db.query(Record).filter(Record.id == record_id).first()
     if record is None:
-        raise LookupError("Record not found")
+        raise HTTPException(status_code=404, detail="Record not found")
     return record
