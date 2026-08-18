@@ -49,6 +49,7 @@ class PipelineRunRequest(BaseModel):
     commission_rate: float = Field(0.10, ge=0, le=1)
     name_match_confidence: float = Field(0.70, ge=0, le=1)
     date_window_days: int = Field(1, ge=0)
+    on_conflict: str = Field('abort', description="Conflict policy: 'abort' | 'overwrite' | 'ignore'")
 
 
 class PipelineRunResponse(BaseModel):
@@ -69,3 +70,6 @@ class PipelineResultsResponse(BaseModel):
     perfect_match_count: int
     mismatch_count: int
     db_path: str
+    abr_dir: str | None = None
+    sot_dir: str | None = None
+    analyzed_dir: str | None = None

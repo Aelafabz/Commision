@@ -4,67 +4,298 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Commission Dashboard</title>
+    <meta name="description" content="Commission reconciliation dashboard — run the pipeline, trigger exports, and browse stored physician commission records." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app">
-      <section class="panel">
-        <h1>Commission Export Control</h1>
-        
-        <form id="export-form" class="form">
-          <label>
-            From date
-            <input id="fromDate" type="date" required />
-          </label>
-          <label>
-            To date
-            <input id="toDate" type="date" required />
-          </label>
-          <label>
-            Physicians
-            <input id="physicians" type="text" placeholder="Dr. Ahmed, Dr. Sara" />
-          </label>
-          <button id="submit-btn" type="submit">Start export</button>
-        </form>
 
-        <p id="status" class="status"></p>
+    <!-- ── Sidebar nav ── -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <span class="sidebar-title">Commission</span>
+      </div>
+      <ul class="nav-list" role="list">
+        <li>
+          <a href="#pipeline" class="nav-link active" data-section="pipeline" id="nav-pipeline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Pipeline
+          </a>
+        </li>
+        <li>
+          <a href="#export" class="nav-link" data-section="export" id="nav-export">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </a>
+        </li>
+        <li>
+          <a href="#records" class="nav-link" data-section="records" id="nav-records">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+            Records
+          </a>
+        </li>
+        <li>
+          <a href="#db" class="nav-link" data-section="db" id="nav-db">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="9" ry="3"/><path d="M3 6v6c0 1.66 4 3 9 3s9-1.34 9-3V6"/></svg>
+            Database
+          </a>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <span class="api-badge" id="api-badge" title="API health status">
+          <span class="dot"></span><span id="api-status-text">Connecting…</span>
+        </span>
+        <div id="external-access" style="margin-top:0.5rem;font-size:0.78rem;color:var(--text-muted)">Discovering network address…</div>
+      </div>
+    </nav>
 
-        <h3>Recent export log</h3>
-        <pre id="log-box" class="log-box">Loading...</pre>
+    <!-- ── Main content ── -->
+    <main class="content" role="main">
+
+      <!-- ─── Pipeline Section ─────────────────────────────────────────── -->
+      <section class="page" id="page-pipeline">
+        <header class="page-header">
+          <div>
+            <h1 class="page-title">Reconciliation Pipeline</h1>
+            <p class="page-subtitle">Run the headless primary → secondary → category pipeline against Abronal and SoT folders.</p>
+          </div>
+        </header>
+
+        <div class="card-grid two-col">
+          <!-- Form card -->
+          <div class="card">
+            <h2 class="card-title">Pipeline Parameters</h2>
+            <form id="pipeline-form" class="form" novalidate>
+              <div class="field-group">
+                <label class="field-label" for="abrDir">Abronal folder path</label>
+                <div class="input-browse-row">
+                    <input class="field-input" id="abrDir" type="text" placeholder="Select Abronal folder" required autocomplete="off" spellcheck="false" readonly />
+                    <input id="abr-upload" type="file" webkitdirectory directory multiple style="display:none" />
+                    <button type="button" class="btn btn-ghost btn-sm" id="abr-upload-btn" title="Upload Abronal folder">
+                      Upload
+                    </button>
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="sotDir">SoT folder path</label>
+                <div class="input-browse-row">
+                    <input class="field-input" id="sotDir" type="text" placeholder="Select SoT folder" required autocomplete="off" spellcheck="false" readonly />
+                    <input id="sot-upload" type="file" webkitdirectory directory multiple style="display:none" />
+                    <button type="button" class="btn btn-ghost btn-sm" id="sot-upload-btn" title="Upload SoT folder">
+                      Upload
+                    </button>
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="dateLabel">Date label <span class="field-hint">(optional)</span></label>
+                <input class="field-input" id="dateLabel" type="text" placeholder="e.g. July 20 to July 22" autocomplete="off" />
+              </div>
+              <div class="field-row">
+                <div class="field-group">
+                  <label class="field-label" for="commissionRate">Commission rate</label>
+                  <input class="field-input" id="commissionRate" type="number" value="0.10" min="0" max="1" step="0.01" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="nameConfidence">Name confidence</label>
+                  <input class="field-input" id="nameConfidence" type="number" value="0.70" min="0" max="1" step="0.01" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="dateWindow">Date window (days)</label>
+                  <input class="field-input" id="dateWindow" type="number" value="1" min="0" step="1" />
+                </div>
+              </div>
+              <button class="btn btn-primary" id="pipeline-btn" type="submit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Run Pipeline
+              </button>
+            </form>
+
+            <div id="pipeline-alert" class="alert hidden"></div>
+          </div>
+
+
+          <!-- Status card -->
+          <div class="card">
+            <div class="card-title-row">
+              <h2 class="card-title">Pipeline Log</h2>
+              <span class="badge" id="pipeline-badge">Idle</span>
+            </div>
+            <pre class="log-box" id="pipeline-log">No run started yet.</pre>
+
+            <div id="pipeline-paths" class="field-hint" style="margin-top:0.6rem;">
+              <span class="field-hint">Analyzed folders:</span>
+              <code id="pipeline-paths-code">—</code>
+              <button class="btn btn-ghost btn-sm" id="save-analyzed-btn" style="margin-left:0.5rem">Save Analyzed</button>
+            </div>
+
+            <div id="pipeline-results" class="hidden">
+              <div class="stat-row" id="pipeline-stats"></div>
+              <div class="table-wrap">
+                <table id="pipeline-table" class="data-table">
+                  <thead><tr id="pipeline-head"></tr></thead>
+                  <tbody id="pipeline-body"><tr><td>No results.</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section class="panel">
-        <h2>Stored Records</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Doctor</th>
-              <th>Service</th>
-              <th>Amount</th>
-              <th>Category</th>
-            </tr>
-          </thead>
-          <tbody id="records-body">
-            <tr><td colspan="4">Loading...</td></tr>
-          </tbody>
-        </table>
+      <!-- ─── DB Inspector Section ───────────────────────────────────────────── -->
+      <section class="page hidden" id="page-db">
+        <header class="page-header">
+          <div>
+            <h1 class="page-title">Database Tables</h1>
+            <p class="page-subtitle">Browse SQLite tables and preview rows from the commission database.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="refresh-db-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+        </header>
+
+        <div class="card-grid two-col">
+          <div class="card">
+            <h2 class="card-title">Tables</h2>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;align-items:center">
+              <button class="btn btn-ghost btn-sm" id="db-refresh-btn">Refresh</button>
+              <input id="db-from-date" type="date" class="field-input" style="width:150px" />
+              <input id="db-to-date" type="date" class="field-input" style="width:150px" />
+              <input id="db-doctor-name" type="text" class="field-input" placeholder="Doctor name (optional)" style="width:180px" />
+              <button class="btn btn-primary btn-sm" id="db-doctor-summary-btn">Doctor Summary</button>
+              <button class="btn btn-ghost btn-sm" id="db-doctor-export-btn">Export CSV</button>
+            </div>
+            <div id="db-tables-list">Loading…</div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Preview</h2>
+            <div id="db-table-preview">
+
+              <p class="empty-cell">Select a table to preview its columns and sample rows.</p>
+            </div>
+          </div>
+        </div>
       </section>
-            <section class="panel">
-        <h2>Reconciliation Pipeline</h2>
-        <form id="pipeline-form" class="form">
-          <label>Abronal folder <input id="abrDir" type="text" required /></label>
-          <label>SoT folder <input id="sotDir" type="text" required /></label>
-          <label>Date label <input id="dateLabel" type="text" placeholder="July 20 to July 22" /></label>
-          <button id="pipeline-btn" type="submit">Run Pipeline</button>
-        </form>
-        <p id="pipeline-status" class="status"></p>
-        <table>
-          <thead><tr id="pipeline-head"></tr></thead>
-          <tbody id="pipeline-body"><tr><td>No run yet.</td></tr></tbody>
-        </table>
+
+      <!-- ─── Export Section ─────────────────────────────────────────────── -->
+      <section class="page hidden" id="page-export">
+        <header class="page-header">
+          <div>
+            <h1 class="page-title">Physician Export</h1>
+            <p class="page-subtitle">Trigger a physician-performance export for a date range and optionally filter by physician names.</p>
+          </div>
+        </header>
+
+        <div class="card-grid two-col">
+          <div class="card">
+            <h2 class="card-title">Export Parameters</h2>
+            <form id="export-form" class="form" novalidate>
+              <div class="field-row">
+                <div class="field-group">
+                  <label class="field-label" for="fromDate">From date</label>
+                  <input class="field-input" id="fromDate" type="date" required />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="toDate">To date</label>
+                  <input class="field-input" id="toDate" type="date" required />
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="physicians">Physicians <span class="field-hint">(comma-separated, leave blank for all)</span></label>
+                <input class="field-input" id="physicians" type="text" placeholder="Dr. Ahmed, Dr. Sara" autocomplete="off" />
+              </div>
+              <button class="btn btn-primary" id="submit-btn" type="submit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Start Export
+              </button>
+            </form>
+            <div id="export-alert" class="alert hidden"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title-row">
+              <h2 class="card-title">Export Log</h2>
+              <button class="btn btn-ghost btn-sm" id="refresh-log-btn" title="Refresh log">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Refresh
+              </button>
+            </div>
+            <pre class="log-box" id="log-box">Loading…</pre>
+          </div>
+        </div>
       </section>
+
+      <!-- ─── Records Section ────────────────────────────────────────────── -->
+      <section class="page hidden" id="page-records">
+        <header class="page-header">
+          <div>
+            <h1 class="page-title">Commission Records</h1>
+            <p class="page-subtitle">All physician commission records persisted in the database.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="refresh-records-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+        </header>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table class="data-table" id="records-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Doctor</th>
+                  <th>Service</th>
+                  <th>Amount</th>
+                  <th>Category</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="records-body">
+                <tr><td colspan="6" class="empty-cell">Loading records…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="table-count" id="records-count"></p>
+        </div>
+      </section>
+
     </main>
 
+    <!-- ── Folder Picker Modal ── -->
+    <div class="modal-backdrop hidden" id="picker-backdrop" role="dialog" aria-modal="true" aria-label="Select folder">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <h3 class="modal-title">Select Folder</h3>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="picker-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-breadcrumb" id="picker-breadcrumb"></div>
+        <div class="modal-body" id="picker-body">
+          <p class="picker-loading">Loading…</p>
+        </div>
+        <div class="modal-footer">
+          <div class="picker-selected-wrap">
+            <span class="field-hint">Selected:</span>
+            <code class="picker-selected-path" id="picker-selected-path">—</code>
+          </div>
+          <div class="modal-footer-actions">
+            <button class="btn btn-ghost btn-sm" id="picker-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="picker-confirm">Select This Folder</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-+1uI6RNcH4L7YxqN3Y3Qv1b9k7yL4x0QnI2Kq6s9uVYw1k0GZ+e2xYjK3b6qz0Jq9hQ1h2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   </body>
 </html>

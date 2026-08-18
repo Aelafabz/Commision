@@ -203,7 +203,8 @@ def run_primary_reconciliation(abr_dir: str, sot_dir: str, log_fn=print) -> Prim
         rem_a = [a for idx, a in enumerate(rem_a) if idx not in matched_a]
         rem_s = [s for idx, s in enumerate(rem_s) if idx not in matched_s]
 
-       # same amount, different service -> "Service Mismatch"       i = 0
+        # same amount, different service -> "Service Mismatch"
+        i = 0
         while i < len(rem_a):
             a = rem_a[i]
             found = False

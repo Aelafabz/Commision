@@ -9,6 +9,10 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
+import sqlite3
+import pandas as pd
+from fastapi.responses import JSONResponse
+
 from ..schemas import (
     PipelineResultsResponse,
     PipelineRunRequest,
@@ -76,11 +80,12 @@ def _execute_pipeline(run_id: str, payload: PipelineRunRequest) -> None:
             commission_rate=payload.commission_rate,
             name_match_confidence=payload.name_match_confidence,
             date_window_days=payload.date_window_days,
+            on_conflict=getattr(payload, 'on_conflict', 'abort'),
             log_fn=lambda msg: _append_log(run_id, msg),
         )
 
         summary_df = tables["commission_summary"]
-        perfect_df """0..1 similarity: character similarity, boosted by word-subset overlap.""" = tables["perfect_matches"]
+        perfect_df = tables["perfect_matches"]
         mismatch_df = tables["unmatched"]
 
         _set_job(
@@ -91,6 +96,7 @@ def _execute_pipeline(run_id: str, payload: PipelineRunRequest) -> None:
             commission_summary=summary_df.to_dict(orient="records"),
             perfect_match_count=int(len(perfect_df)),
             mismatch_count=int(len(mismatch_df)),
+            analyzed_dir=tables.get("analyzed_dir"),
         )
     except Exception as exc:  # noqa: BLE001
         _append_log(run_id, f"ERROR: {exc}")
@@ -110,10 +116,70 @@ def start_pipeline(payload: PipelineRunRequest, background_tasks: BackgroundTask
             "status": "queued",
             "log": [],
             "created_at": datetime.utcnow().isoformat(),
+            "abr_dir": payload.abr_dir,
+            "sot_dir": payload.sot_dir,
         }
 
     background_tasks.add_task(_execute_pipeline, run_id, payload)
     return PipelineRunResponse(run_id=run_id, status="queued")
+
+
+@router.post('/check')
+def check_pipeline(payload: PipelineRunRequest):
+    """Run the pipeline in dry-run mode and check for overlapping records in the DB.
+
+    Returns 200 with {ok: True, candidates: N} when no overlaps found, otherwise 409 with overlap details.
+    """
+    try:
+        # ensure scripts dir on sys.path
+        scripts_dir = str(_scripts_dir())
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from pipeline import run_pipeline
+
+        tables = run_pipeline(
+            abr_dir=payload.abr_dir,
+            sot_dir=payload.sot_dir,
+            dictionary_path=payload.dictionary_path or None,
+            db_path=payload.db_path or str(_default_db_path()),
+            date_label=payload.date_label or "",
+            commission_rate=payload.commission_rate,
+            name_match_confidence=payload.name_match_confidence,
+            date_window_days=payload.date_window_days,
+            dry_run=True,
+        )
+
+        # If records table present, check overlaps
+        records = tables.get('records')
+        if records is None or records.empty:
+            return {"ok": True, "candidates": 0}
+
+        # detect overlaps
+        conn = sqlite3.connect(str(_default_db_path()))
+        cur = conn.cursor()
+        overlaps = []
+        for doctor in records['doctor_name'].dropna().unique():
+            sub = records[records['doctor_name'] == doctor]
+            if sub.empty:
+                continue
+            try:
+                min_date = pd.to_datetime(sub['date'], errors='coerce').min()
+                max_date = pd.to_datetime(sub['date'], errors='coerce').max()
+                min_s = str(min_date)
+                max_s = str(max_date)
+            except Exception:
+                continue
+            cur.execute("SELECT COUNT(*) as c, MIN(date) as min_date, MAX(date) as max_date FROM records WHERE doctor_name = ? AND DATE(date) BETWEEN DATE(?) AND DATE(?)", (doctor, min_s, max_s))
+            row = cur.fetchone()
+            if row and row[0] and int(row[0]) > 0:
+                overlaps.append({'doctor': doctor, 'existing_count': int(row[0]), 'existing_min_date': row[1], 'existing_max_date': row[2], 'incoming_min_date': min_s, 'incoming_max_date': max_s})
+
+        if overlaps:
+            return JSONResponse(status_code=409, content={'type': 'overlap', 'overlaps': overlaps})
+
+        return {"ok": True, "candidates": len(records)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/status/{run_id}", response_model=PipelineStatusResponse)
@@ -145,4 +211,7 @@ def get_results(run_id: str) -> PipelineResultsResponse:
         perfect_match_count=job["perfect_match_count"],
         mismatch_count=job["mismatch_count"],
         db_path=job["db_path"],
+        abr_dir=job.get("abr_dir"),
+        sot_dir=job.get("sot_dir"),
+        analyzed_dir=job.get("analyzed_dir"),
     )

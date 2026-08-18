@@ -7,3 +7,4 @@ test_secret_helper.py
 *.xls
 *.db
 *.txt
+*.xlsx#
