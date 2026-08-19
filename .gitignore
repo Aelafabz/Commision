@@ -1,1 +1,4 @@
 .env
+*.log
+*.pyc
+test_secret_helper.py
