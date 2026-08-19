@@ -1,0 +1,131 @@
+Commission Web App — Build Plan 
+    2     
+    3     ## Architecture Overview
+    4     
+    5         ┌─────────────────────────────────────────┐
+    ⋮         │ Browser / Frontend\nVanilla HTML+JS+CSS │
+    ⋮         └─────────────────────────────────────────┘
+    ⋮                              │ REST API
+    ⋮                              ▼
+    ⋮         ┌─────────────────┐
+    ⋮         │ FastAPI Backend │
+    ⋮         └─────────────────┘
+>   ⋮                  │
+    ⋮                  ▼
+    ⋮         ┌───────────────────────────┐    ┌─────────────────────────┐
+    ⋮         │ Neo-Scripts\nscripts/new/ │    │ DB Manager Scripts\ndb/ │
+    ⋮         └───────────────────────────┘    └─────────────────────────┘
+    ⋮                       │                               │
+    ⋮                       ▼                               ▼
+    ⋮         ┌───────────────────────────┐
+    ⋮         │ SQLite DB\ncommissions.db │
+    ⋮         └───────────────────────────┘
+   14     
+              B ──► C
+          
+   15     ## Project Structure
+   16     
+   17       Commision-main/
+   18       ├── app/
+   19       │   ├── main.py                   ← FastAPI entry point
+   20       │   ├── routers/
+   21       │   │   ├── reconciliation.py     ← /api/reconciliation routes
+   22       │   │   └── evaluation.py         ← /api/evaluation routes
+   23       │   ├── services/
+   24       │   │   ├── db_service.py         ← DB session + helpers
+   25       │   │   └── pipeline_service.py   ← Orchestrates neo-scripts
+   26       │   └── static/
+   27       │       ├── index.html            ← Main page
+   28       │       ├── evaluation.html       ← Evaluation page
+   29       │       └── js/ css/
+   30       ├── scripts/
+   31       │   ├── new/
+   32       │   │   ├── primary_reconciliation.py
+   33       │   │   ├── secondary_name_matcher.py
+   34       │   │   └── category_merger.py
+   35       │   └── (existing scripts)
+   36       ├── db/
+   37       │   ├── schema.sql                ← Revised schema w/ FKs
+   │   ├── init_db.py                ← Create/reset DB
+   39       │   └── migrate_db.py             ← Add FKs to existing DB
+   40       ├── database/
+   41       │   └── commissions.db            ← SQLite DB
+   42       └── configs/
+   43           └── dictionary.json           ← Category mapping
+   45     
+   46     ## Database Schema Changes (with Foreign Keys)
+   47     
+   48     ### Tables & Relations
+          
+   49     • physicians — master physician list (NEW)
+   50     • service_prices — maps service_type → cost + category
+   51     • sot_mirror — raw SOT data (FK → physicians)
+   52     • abronal_mirror — raw abronal data (FK → physicians)
+   53     • matched_records — reconciled matches (FK → physicians)
+   54     • unmatched_records — mismatches (FK → physicians)
+   55     • commission_per_physicians — final aggregated commission (FK → physicians)
+   56     
+   57     ## Neo-Scripts (scripts/new/)
+   58     
+   59     ### primary_reconciliation.py
+          
+   60     • Extracted core logic from reconciliation_app_v5.py (headless, no tkinter)
+   61     • load_sot(sot_dir) — loads SOT files from upload folder
+   62     • load_abronal(abr_dir) — loads abronal files, extracts physician name from filename     
+   63     • run_reconciliation(abr_dir, sot_dir, progress_cb) → {matched, unmatched}
+   64     • Saves matched → DB matched_records, unmatched → DB unmatched_records
+   65     
+   66     ### secondary_name_matcher.py
+          
+   67     • load_mismatched_data() — loads unmatched records from DB
+   68     • name_comparator(threshold=0.70) — fuzzy match with 70% confidence + amount/date        
+          proximity
+   69     • grafter() — merges confirmed matches into matched_records, drops rest to unreconciled  
+   70     
+   71     ### category_merger.py
+          
+   72     • class Condensor
+   73         • read_dictionary(path) — loads dictionary.json
+   74         • load_data() — loads matched_records from DB
+   75         • list_condensor() — groups by patient+physician, sums by category, writes to        
+              commission_per_physicians
+   76     
+          
+   77     ## API Endpoints
+   78     
+>  79     ### Main Page — /api/reconciliation
+ 80      Method                      │ Path                       │ Description
+          ─────────────────────────────┼────────────────────────────┼──────────────────────────────
+   82      POST                        │ /upload/sot                │ Upload SOT Excel files
+   83      POST                        │ /upload/abronal            │ Upload Abronal Excel files
+   84      POST                        │ /run/primary               │ Run primary reconciliation
+   85      POST                        │ /run/secondary             │ Run secondary name matcher
+   86      POST                        │ /run/category-merge        │ Run category merger
+   87      GET                         │ /status/{job_id}           │ SSE stream for progress/logs
+   88     
+   89     ### Evaluation Page — /api/evaluation
+          
+   90      Method                     │ Path                       │ Description
+          ────────────────────────────┼────────────────────────────┼───────────────────────────────
+   92      GET                        │ /tables                    │ List available tables
+   93      GET                        │ /data/{table}              │ Get table data (with filters)
+   94      GET                        │ /export/{table}            │ Export table to Excel
+   95      GET                        │ /export/all                │ Export all tables to Excel
+   96     
+   97     ## Frontend Pages
+   98     
+   99     ### Main Page (index.html)
+          
+  100     • File Upload Station: two drop zones (SOT files, Abronal files)
+  101     • Pipeline Controls: Run Primary / Run Secondary / Run Merger buttons
+  102     • Progress Bar: animated, step-aware (Primary → Secondary → Merger)
+  103     • Log Window: scrolling real-time log via SSE
+  104     • Status Messages: success/fail badges per step
+  105     
+  106     ### Evaluation Page (evaluation.html)
+          
+  107     • Table Selector: dropdown for each DB table
+  108     • Data Table: paginated, sortable
+  109     • Column Filters: dropdown per column (dynamic based on data)
+  110     • Date Range Picker: filter by date range
+> 111     • Export Buttons: "Export This Table" + "Export All Tables"

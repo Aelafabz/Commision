@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commission Reconciliation</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-brand">Commission App</a>
+    <a href="/" class="nav-link active">Reconciliation</a>
+    <a href="/evaluation" class="nav-link">Evaluation</a>
+  </nav>
+
+  <main class="page">
+    <h1 class="page-title">Commission Reconciliation Pipeline</h1>
+
+    <!-- Upload Station -->
+    <div class="grid-2">
+      <div class="card">
+        <h2 class="card-title">SOT Files</h2>
+        <div class="upload-zone" id="sot-zone">
+          <input type="file" id="sot-input" accept=".xlsx" multiple>
+          <div class="upload-icon">📄</div>
+          <div class="upload-label">Drop SOT Excel files here or click to browse</div>
+          <div class="upload-hint">Source of Truth files (.xlsx)</div>
+        </div>
+        <div class="file-list" id="sot-file-list"></div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-sm" id="sot-upload-btn" disabled>Upload SOT Files</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Abronal Files</h2>
+        <div class="upload-zone" id="abronal-zone">
+          <input type="file" id="abronal-input" accept=".xlsx" multiple>
+          <div class="upload-icon">📋</div>
+          <div class="upload-label">Drop Abronal Excel files here or click to browse</div>
+          <div class="upload-hint">Abronal eHealth export files (.xlsx)</div>
+        </div>
+        <div class="file-list" id="abronal-file-list"></div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-sm" id="abronal-upload-btn" disabled>Upload Abronal Files</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline Controls -->
+    <div class="card" style="margin-top: 1rem;">
+      <h2 class="card-title">Pipeline Controls</h2>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="run-primary-btn" disabled>
+          ▶ Run Primary Reconciliation
+        </button>
+        <button class="btn btn-success" id="run-secondary-btn" disabled>
+          🔍 Run Secondary Name Matcher
+        </button>
+        <button class="btn btn-warning" id="run-merger-btn" disabled>
+          🧮 Run Category Merger
+        </button>
+      </div>
+      <div class="btn-group" style="margin-top: .5rem;">
+        <label class="filter-group" style="flex-direction: row; align-items: center; gap: .4rem;">
+          <span style="font-size: .78rem; color: var(--gray-500);">Confidence:</span>
+          <input type="number" id="confidence-input" value="0.70" step="0.05" min="0" max="1" style="width: 70px; padding: .3rem .5rem; border: 1px solid var(--gray-300); border-radius: var(--radius);">
+        </label>
+        <label class="filter-group" style="flex-direction: row; align-items: center; gap: .4rem;">
+          <span style="font-size: .78rem; color: var(--gray-500);">Amount Tol:</span>
+          <input type="number" id="amount-tol-input" value="1.0" step="0.1" min="0" style="width: 70px; padding: .3rem .5rem; border: 1px solid var(--gray-300); border-radius: var(--radius);">
+        </label>
+        <label class="filter-group" style="flex-direction: row; align-items: center; gap: .4rem;">
+          <span style="font-size: .78rem; color: var(--gray-500);">Date Tol (days):</span>
+          <input type="number" id="date-tol-input" value="1" step="1" min="0" style="width: 70px; padding: .3rem .5rem; border: 1px solid var(--gray-300); border-radius: var(--radius);">
+        </label>
+      </div>
+    </div>
+
+    <!-- Progress & Status -->
+    <div class="card" style="margin-top: 1rem;">
+      <h2 class="card-title">Pipeline Progress</h2>
+
+      <div class="progress-steps" id="progress-steps">
+        <div class="step" data-step="primary">1. Primary</div>
+        <div class="step" data-step="secondary">2. Secondary</div>
+        <div class="step" data-step="merger">3. Merger</div>
+      </div>
+
+      <div class="progress-section">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progress-bar"></div>
+        </div>
+        <div class="progress-label" id="progress-label">0%</div>
+      </div>
+
+      <div class="btn-group" id="status-badges" style="margin-top: .75rem;"></div>
+    </div>
+
+    <!-- Log Window -->
+    <div class="card" style="margin-top: 1rem;">
+      <h2 class="card-title">Live Log</h2>
+      <div class="log-window" id="log-window">
+        <p class="log-line info">Waiting for pipeline to start…</p>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

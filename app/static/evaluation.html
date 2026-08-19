@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluation — Commission App</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-brand">Commission App</a>
+    <a href="/" class="nav-link">Reconciliation</a>
+    <a href="/evaluation" class="nav-link active">Evaluation</a>
+  </nav>
+
+  <main class="page">
+    <h1 class="page-title">Data Evaluation</h1>
+
+    <!-- Summary Cards -->
+    <div class="summary-strip" id="summary-strip">
+      <div class="summary-card">
+        <div class="s-label">Matched Records</div>
+        <div class="s-value" id="sum-matched">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Unmatched Records</div>
+        <div class="s-value" id="sum-unmatched">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Physicians</div>
+        <div class="s-value" id="sum-physicians">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Commission Records</div>
+        <div class="s-value" id="sum-commission">—</div>
+      </div>
+    </div>
+
+    <!-- Table Selector -->
+    <div class="card">
+      <h2 class="card-title">Table Explorer</h2>
+      <div class="filters-row">
+        <div class="filter-group">
+          <label for="table-select">Table</label>
+          <select id="table-select">
+            <option value="">Loading tables…</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="date-start">Date From</label>
+          <input type="date" id="date-start">
+        </div>
+
+        <div class="filter-group">
+          <label for="date-end">Date To</label>
+          <input type="date" id="date-end">
+        </div>
+
+        <div class="filter-group">
+          <label for="page-size">Page Size</label>
+          <select id="page-size">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+          </select>
+        </div>
+
+        <div class="btn-group" style="margin-top: 0;">
+          <button class="btn btn-primary btn-sm" id="apply-filters-btn">Apply Filters</button>
+          <button class="btn btn-secondary btn-sm" id="reset-filters-btn">Reset</button>
+          <button class="btn btn-success btn-sm" id="export-table-btn">Export This Table</button>
+          <button class="btn btn-success btn-sm" id="export-all-btn">Export All Tables</button>
+        </div>
+      </div>
+
+      <!-- Dynamic Column Filters -->
+      <div class="filters-row" id="column-filters" style="margin-top: .5rem;"></div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="card" style="margin-top: 1rem;">
+      <h2 class="card-title">
+        Data
+        <span id="table-info" style="font-weight: 400; text-transform: none; letter-spacing: 0; font-size: .8rem; color: var(--gray-500);"></span>
+      </h2>
+      <div class="table-wrap" id="table-wrap">
+        <table id="data-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body">
+            <tr><td colspan="10" style="text-align: center; color: var(--gray-500); padding: 2rem;">Select a table to view data</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="btn btn-secondary btn-sm" id="prev-page-btn" disabled>← Prev</button>
+        <span id="page-info">Page 1 of 1</span>
+        <button class="btn btn-secondary btn-sm" id="next-page-btn" disabled>Next →</button>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script src="/static/js/evaluation.js"></script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+"""
+secondary_name_matcher.py
+Second-pass fuzzy matching for records that failed exact reconciliation in
+primary_reconciliation.py.
+
+Philosophy:
+- No tkinter / GUI dependencies
+- Progress reported via a callback: progress_cb(step: str, pct: int, msg: str)
+- Operates entirely on rows already sitting in unmatched_records
+- Confirmed matches are grafted into matched_records; everything else is
+  finalized as unreconciled (left in unmatched_records, reason updated)
+"""
+from __future__ import annotations
+
+import sys
+import sqlite3
+from pathlib import Path
+from typing import Callable
+
+import pandas as pd
+
+# Sibling module — same scripts/new/ package
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from primary_reconciliation import (  # noqa: E402
+    DB_PATH,
+    normalize_string,
+    advanced_name_match,
+    date_distance_days,
+    load_category_map,
+)
+
+DEFAULT_THRESHOLD = 0.70
+DATE_PROXIMITY_DAYS = 5
+AMOUNT_TOLERANCE = 0.01
+
+
+# ── Loading ───────────────────────────────────────────────────────────────────
+
+def load_mismatched_data(conn: sqlite3.Connection) -> list[dict]:
+    """Load every row currently sitting in unmatched_records, keyed by column name."""
+    conn.row_factory = sqlite3.Row
+    cur = conn.execute("SELECT * FROM unmatched_records")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.row_factory = None
+    return rows
+
+
+# ── Fuzzy comparison ─────────────────────────────────────────────────────────
+
+def name_comparator(
+    rows: list[dict],
+    threshold: float = DEFAULT_THRESHOLD,
+    progress_cb: Callable[[str, int, str], None] | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Compare the Abronal side against the SoT side of each unmatched row.
+
+    A row is confirmed when:
+      • normalized name similarity >= threshold (default 70%), AND
+      • amounts match within AMOUNT_TOLERANCE, AND
+      • payment dates fall within DATE_PROXIMITY_DAYS of each other
+
+    Returns (confirmed, rejected). Confirmed rows are annotated with a
+    'name_score' field.
+    """
+    confirmed, rejected = [], []
+    total = len(rows) or 1
+
+    for idx, row in enumerate(rows):
+        if progress_cb and idx % 25 == 0:
+            progress_cb('match', 30 + int(40 * idx / total), f"Comparing {idx + 1}/{total}")
+
+        abr_name = normalize_string(row.get('abronal_patient_name', ''))
+        sot_name = normalize_string(row.get('sot_patient_name', ''))
+
+        if not abr_name or not sot_name:
+            rejected.append(row)
+            continue
+
+        name_score = advanced_name_match(abr_name, sot_name)
+
+        try:
+            abr_amt = float(row.get('abronal_net_amount') or 0)
+            sot_amt = float(row.get('sot_amount') or 0)
+        except (TypeError, ValueError):
+            rejected.append(row)
+            continue
+        amt_ok = abs(abr_amt - sot_amt) < AMOUNT_TOLERANCE
+
+        abr_date = pd.to_datetime(row.get('abronal_payment_date'), errors='coerce')
+        sot_date = pd.to_datetime(row.get('sot_payment_date'), errors='coerce')
+        date_ok = date_distance_days(abr_date, sot_date) <= DATE_PROXIMITY_DAYS
+
+        if name_score >= threshold and amt_ok and date_ok:
+            confirmed_row = dict(row)
+            confirmed_row['name_score'] = round(name_score, 3)
+            confirmed.append(confirmed_row)
+        else:
+            rejected.append(row)
+
+    return confirmed, rejected
+
+
+# ── Grafting ──────────────────────────────────────────────────────────────────
+
+def grafter(
+    conn: sqlite3.Connection,
+    confirmed: list[dict],
+    rejected: list[dict],
+    category_map: dict[str, str],
+) -> dict:
+    """
+    Merge confirmed matches into matched_records (removing them from
+    unmatched_records), and finalize the rest as unreconciled by updating
+    their reason_for_mismatch in place.
+    """
+    grafted = 0
+    for row in confirmed:
+        service = row.get('abronal_service_type', '')
+        category = category_map.get(service, 'Other')
+        amount = row.get('abronal_net_amount') or 0
+        payment_date = row.get('sot_payment_date') or row.get('abronal_payment_date')
+        try:
+            conn.execute("""
+                INSERT INTO matched_records
+                    (patient_name, service_type, category, total_amount, net_amount,
+                     payment_date, physician_id, match_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                row.get('abronal_patient_name', ''),
+                service,
+                category,
+                amount,
+                amount,
+                str(payment_date),
+                row.get('physician_id'),
+                f"secondary-fuzzy ({row.get('name_score', 0):.0%})",
+            ))
+            conn.execute("DELETE FROM unmatched_records WHERE id = ?", (row['id'],))
+            grafted += 1
+        except Exception:
+            continue  # Skip constraint errors, leave row in unmatched_records
+
+    dropped = 0
+    for row in rejected:
+        try:
+            conn.execute(
+                "UPDATE unmatched_records SET reason_for_mismatch = ? WHERE id = ?",
+                ("Unreconciled - no confident match found", row['id']),
+            )
+            dropped += 1
+        except Exception:
+            continue
+
+    conn.commit()
+    return {'grafted': grafted, 'dropped': dropped}
+
+
+# ── Main secondary-matching function ─────────────────────────────────────────
+
+def run_secondary_matching(
+    progress_cb: Callable[[str, int, str], None],
+    threshold: float = DEFAULT_THRESHOLD,
+) -> dict:
+    """
+    Run the full secondary name-matching pipeline stage.
+
+    Args:
+        progress_cb: Callback(step, percent, message).
+        threshold: Minimum name-similarity score (0.0-1.0) to confirm a match.
+
+    Returns:
+        Summary dict with counts.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    progress_cb('load', 10, "── Loading Unmatched Records ──")
+    rows = load_mismatched_data(conn)
+    progress_cb('load', 25, f"Loaded {len(rows)} unmatched rows")
+
+    category_map = load_category_map()
+
+    progress_cb('match', 30, f"── Fuzzy Name Matching (threshold={threshold:.0%}) ──")
+    confirmed, rejected = name_comparator(rows, threshold=threshold, progress_cb=progress_cb)
+    progress_cb('match', 70, f"  Confirmed: {len(confirmed)}, Rejected: {len(rejected)}")
+
+    progress_cb('graft', 80, "── Grafting Confirmed Matches ──")
+    result = grafter(conn, confirmed, rejected, category_map)
+
+    conn.close()
+    progress_cb(
+        'done', 100,
+        f"── Secondary Matching Complete: {result['grafted']} grafted, "
+        f"{result['dropped']} unreconciled ──"
+    )
+
+    return {
+        'total_reviewed': len(rows),
+        'confirmed': len(confirmed),
+        **result,
+    }
+
+
+if __name__ == "__main__":
+    def _cli_progress(step: str, pct: int, msg: str) -> None:
+        print(f"[{pct:3d}%] {step:>10} | {msg}")
+
+    run_secondary_matching(_cli_progress)
