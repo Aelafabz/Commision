@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Reconciliation Console — Evaluation</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="title">The Reconciliation Ledger<small>Abronal ⇄ Source-of-Truth Console</small></div>
+  <nav class="tabs">
+    <a href="/">Intake &amp; Run</a>
+    <a href="/evaluation" class="active">Evaluation</a>
+  </nav>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Table &amp; Filters</h2>
+    <div class="filters-row">
+      <div class="field">
+        <label>Table</label>
+        <select id="tableSelect"></select>
+      </div>
+      <div class="field" id="dynamicFilters" style="display:contents;"></div>
+      <div class="field">
+        <label>Start Date</label>
+        <input type="date" id="startDate">
+      </div>
+      <div class="field">
+        <label>End Date</label>
+        <input type="date" id="endDate">
+      </div>
+      <div class="field">
+        <button id="applyBtn">Apply Filters</button>
+      </div>
+      <div class="field">
+        <button id="clearBtn" class="secondary">Clear</button>
+      </div>
+    </div>
+    <div class="meta-line" id="rowCount"></div>
+    <div class="table-scroll">
+      <table id="dataTable">
+        <thead><tr></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button id="exportTableBtn">Export This Table to Excel</button>
+      <button id="exportAllBtn" class="accent">Export Full Database History</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const API = "/api";
+let currentTable = null;
+let currentColumns = [];
+let currentRows = [];
+
+const tableSelect = document.getElementById('tableSelect');
+const dynamicFilters = document.getElementById('dynamicFilters');
+const rowCountEl = document.getElementById('rowCount');
+const thead = document.querySelector('#dataTable thead tr');
+const tbody = document.querySelector('#dataTable tbody');
+
+async function loadTableList() {
+  const res = await fetch(`${API}/tables/list`);
+  const data = await res.json();
+  tableSelect.innerHTML = data.tables.map(t => `<option value="${t}">${t}</option>`).join('');
+  tableSelect.value = 'commission_per_physicians';
+  await loadTable();
+}
+tableSelect.addEventListener('change', loadTable);
+
+async function loadTable() {
+  currentTable = tableSelect.value;
+  const colRes = await fetch(`${API}/tables/${currentTable}/columns`);
+  const colData = await colRes.json();
+  currentColumns = colData.columns;
+  buildFilterInputs(currentColumns);
+  await fetchAndRender();
+}
+
+function buildFilterInputs(columns) {
+  // Offer a filter box for a handful of the most useful columns.
+  const preferred = columns.filter(c =>
+    /name|physician|service|category|status|source_file|match_type|reason/i.test(c)
+  ).slice(0, 3);
+  dynamicFilters.innerHTML = preferred.map(c => `
+    <div class="field">
+      <label>${c}</label>
+      <input type="text" data-filter-col="${c}" placeholder="exact match…">
+    </div>
+  `).join('');
+}
+
+function collectFilters() {
+  const filters = {};
+  dynamicFilters.querySelectorAll('[data-filter-col]').forEach(inp => {
+    if (inp.value.trim()) filters[inp.dataset.filterCol] = inp.value.trim();
+  });
+  return filters;
+}
+
+async function fetchAndRender() {
+  const filters = collectFilters();
+  const params = new URLSearchParams(filters);
+  const res = await fetch(`${API}/tables/${currentTable}?${params.toString()}`);
+  const data = await res.json();
+  currentRows = applyDateFilter(data.rows);
+  renderTable(currentColumns, currentRows);
+}
+
+function applyDateFilter(rows) {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  if (!start && !end) return rows;
+  const dateCol = currentColumns.find(c => /date/i.test(c));
+  if (!dateCol) return rows;
+  return rows.filter(r => {
+    const v = r[dateCol];
+    if (!v) return false;
+    const d = new Date(v);
+    if (isNaN(d)) return false;
+    if (start && d < new Date(start)) return false;
+    if (end && d > new Date(end)) return false;
+    return true;
+  });
+}
+
+function renderTable(columns, rows) {
+  thead.innerHTML = columns.map(c => `<th>${c}</th>`).join('');
+  tbody.innerHTML = rows.map(r => `<tr>${columns.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`).join('');
+  rowCountEl.textContent = `${rows.length} row(s) — table: ${currentTable}`;
+}
+
+document.getElementById('applyBtn').addEventListener('click', fetchAndRender);
+document.getElementById('clearBtn').addEventListener('click', () => {
+  dynamicFilters.querySelectorAll('input').forEach(i => i.value = '');
+  document.getElementById('startDate').value = '';
+  document.getElementById('endDate').value = '';
+  fetchAndRender();
+});
+
+document.getElementById('exportTableBtn').addEventListener('click', async () => {
+  const filters = collectFilters();
+  const start_date = document.getElementById('startDate').value || null;
+  const end_date = document.getElementById('endDate').value || null;
+  const res = await fetch(`${API}/export/table/${currentTable}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filters, start_date, end_date }),
+  });
+  await downloadBlob(res, `${currentTable}.xlsx`);
+});
+
+document.getElementById('exportAllBtn').addEventListener('click', async () => {
+  const start_date = document.getElementById('startDate').value || null;
+  const end_date = document.getElementById('endDate').value || null;
+  const res = await fetch(`${API}/export/all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_date, end_date }),
+  });
+  await downloadBlob(res, `database_history.xlsx`);
+});
+
+async function downloadBlob(res, fallbackName) {
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match ? match[1] : fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+loadTableList();
+</script>
+</body>
+</html>
