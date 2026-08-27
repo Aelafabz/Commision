@@ -1,0 +1,6 @@
+-? add flag for user found mismatches the matched records,
+-? fix the date filter bug, First of it straight up does not work, secondly it should return any date range matches within the specified period even if there are empty dates/ gaps between, the logic should be based on the payment date listed on each table, striping it into a dd/mm/yyy format only if hh:mm exists.
+- add physician_name row and filter to the matched and the unmatched tables
++ whenever a list is added to the databse, it should be inserted by date, data scraped should be checked it is duplicate if it is don't store it else insert based on date.
++ all records inside the database should be ordered by date
++ on the commissions_per_physician table for some reason entries for a physician are split into two parts, these entries should always be grouped and ordered ny physician name first then by date
