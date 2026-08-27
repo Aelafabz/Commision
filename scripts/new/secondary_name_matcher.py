@@ -5,8 +5,6 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 
-import pandas as pd
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "db"))
 import db_manager as dbm  # noqa: E402
 
@@ -16,11 +14,12 @@ AMOUNT_TOLERANCE = 0.01
 
 
 def _parse_date(value):
-    if not value:
+    iso = dbm.normalize_date_to_iso(value)
+    if not iso:
         return None
     try:
-        return pd.to_datetime(value, errors="coerce")
-    except Exception:
+        return datetime.strptime(iso, "%Y-%m-%d")
+    except ValueError:
         return None
 
 
@@ -96,14 +95,29 @@ def grafter(buffer, batch_id, log=print):
             else:
                 service_id = dbm.get_or_create_service(conn, a["abronal_service_type"])
 
+            match_key = {
+                "patient_name": pair["renamed_to"],
+                "service_id": service_id,
+                "net_amount": a["abronal_net_amount"],
+                "payment_date": a["abronal_payment_date"],
+                "physician_id": a["physician_id"],
+                "abronal_row_id": a["abronal_row_id"],
+                "sot_row_id": s["sot_row_id"],
+            }
+            if dbm.row_exists(conn, "matched_records", match_key):
+                conn.execute("DELETE FROM unmatched_records WHERE unmatched_id = ?", (a["unmatched_id"],))
+                conn.execute("DELETE FROM unmatched_records WHERE unmatched_id = ?", (s["unmatched_id"],))
+                continue
+
             conn.execute(
                 """INSERT INTO matched_records
                    (patient_name, service_id, total_amount, net_amount, payment_date,
-                    physician_id, match_type, confidence, abronal_row_id, sot_row_id, batch_id)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    physician_id, match_type, confidence, user_flagged_mismatch, user_flag_reason,
+                    abronal_row_id, sot_row_id, batch_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (pair["renamed_to"], service_id, a["abronal_net_amount"], a["abronal_net_amount"],
                  a["abronal_payment_date"], a["physician_id"], "fuzzy_name", pair["confidence"],
-                 a["abronal_row_id"], s["sot_row_id"], batch_id),
+                 0, None, a["abronal_row_id"], s["sot_row_id"], batch_id),
             )
             conn.execute("DELETE FROM unmatched_records WHERE unmatched_id = ?", (a["unmatched_id"],))
             conn.execute("DELETE FROM unmatched_records WHERE unmatched_id = ?", (s["unmatched_id"],))

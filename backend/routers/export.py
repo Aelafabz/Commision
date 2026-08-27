@@ -19,14 +19,6 @@ import auth  # noqa: E402
 
 router = APIRouter(dependencies=[Depends(auth.require_user)])
 
-DATE_COLUMNS = {
-    "abronal_mirror": "payment_date",
-    "sot_mirror": "transaction_date",
-    "matched_records": "payment_date",
-    "unmatched_records": "abronal_payment_date",
-    "commission_per_physicians": "payment_date",
-}
-
 
 def _check_table_access(table: str, user: dict) -> None:
     allowed = dbm.get_user_allowed_tables(user["user_id"], user["role"])
@@ -42,10 +34,9 @@ def _filtered_frame(table: str, filters: dict | None, start_date: str | None, en
     # dd/mm/yyyy date whenever the day is <= 12 — exporting used to
     # disagree with what the Evaluation page filtered to for exactly
     # that reason.
-    date_col = DATE_COLUMNS.get(table)
     rows = dbm.fetch_table(
         table, filters=filters, limit=200000,
-        date_column=date_col, start_date=start_date, end_date=end_date,
+        start_date=start_date, end_date=end_date,
     )
     return pd.DataFrame(rows)
 

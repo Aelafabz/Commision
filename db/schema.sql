@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS matched_records (
     physician_id    INTEGER REFERENCES physicians(physician_id),
     match_type      TEXT NOT NULL DEFAULT 'exact',   -- exact | fuzzy_name
     confidence      REAL,
+    user_flagged_mismatch INTEGER NOT NULL DEFAULT 0,
+    user_flag_reason TEXT DEFAULT NULL,
     abronal_row_id  INTEGER REFERENCES abronal_mirror(row_id),
     sot_row_id      INTEGER REFERENCES sot_mirror(row_id),
     batch_id        TEXT

@@ -15,7 +15,9 @@ ENC_PREFIX = "enc:"
 
 
 class CryptoError(Exception):
-  
+    pass
+
+
 def generate_key(force: bool = False) -> Path:
     if KEY_PATH.exists() and not force:
         raise CryptoError(f"{KEY_PATH} already exists — pass --force to overwrite it.")

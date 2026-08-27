@@ -175,6 +175,11 @@ def persist_mirrors(abr_rows, sot_rows, batch_id, log):
                 "source_file": r["source_file"],
             }
             if dbm.row_exists(conn, "abronal_mirror", row_key):
+                existing_id = dbm.find_row_id(conn, "abronal_mirror", row_key)
+                if existing_id is not None:
+                    r["row_id"] = existing_id
+                    r["physician_id"] = physician_id
+                    r["service_id"] = service_id
                 continue
             cur = conn.execute(
                 """INSERT INTO abronal_mirror
@@ -202,6 +207,10 @@ def persist_mirrors(abr_rows, sot_rows, batch_id, log):
                 "source_file": r["source_file"],
             }
             if dbm.row_exists(conn, "sot_mirror", row_key):
+                existing_id = dbm.find_row_id(conn, "sot_mirror", row_key)
+                if existing_id is not None:
+                    r["row_id"] = existing_id
+                    r["service_id"] = service_id
                 continue
             cur = conn.execute(
                 """INSERT INTO sot_mirror
@@ -230,6 +239,10 @@ def match_records(abr_rows, sot_rows, batch_id, log):
     consumed_sot_ids = set()
 
     for a in abr_rows:
+        if not a.get("row_id"):
+            log(f"  WARNING: skipping Abronal row without row_id: {a.get('patient_full_name')}")
+            unmatched_abr.append(a)
+            continue
         norm_name = normalize_string(a["patient_full_name"])
         candidates = [s for s in sot_by_name.get(norm_name, []) if s["row_id"] not in consumed_sot_ids]
         found = None
@@ -277,11 +290,12 @@ def persist_results(matched, unmatched_abr, unmatched_sot, batch_id, log):
             conn.execute(
                 """INSERT INTO matched_records
                    (patient_name, service_id, total_amount, net_amount, payment_date,
-                    physician_id, match_type, confidence, abronal_row_id, sot_row_id, batch_id)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    physician_id, match_type, confidence, user_flagged_mismatch, user_flag_reason,
+                    abronal_row_id, sot_row_id, batch_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (m["patient_name"], m["service_id"], m["total_amount"], m["net_amount"],
                  m["payment_date"], m["physician_id"], m["match_type"], m["confidence"],
-                 m["abronal_row_id"], m["sot_row_id"], batch_id),
+                 0, None, m["abronal_row_id"], m["sot_row_id"], batch_id),
             )
         for a in unmatched_abr:
             unmatched_key = {

@@ -20,6 +20,16 @@ def _check_table_access(table: str, user: dict) -> None:
         raise HTTPException(status_code=403, detail=f"You don't have access to '{table}'")
 
 
+@router.get("/date-columns")
+def date_columns(user=Depends(auth.require_user)):
+    allowed = set(dbm.get_user_allowed_tables(user["user_id"], user["role"]))
+    return {
+        "date_columns": {
+            table: col for table, col in dbm.TABLE_DATE_COLUMNS.items() if table in allowed
+        }
+    }
+
+
 @router.get("/list")
 def list_tables(user=Depends(auth.require_user)):
     return {"tables": dbm.get_user_allowed_tables(user["user_id"], user["role"])}

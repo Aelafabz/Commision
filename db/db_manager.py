@@ -55,34 +55,39 @@ def new_batch_id() -> str:
 # can compare lexically, or None if the value truly can't be parsed
 # (which safely excludes it from range filters rather than erroring).
 
-_TIME_SUFFIX_RE = re.compile(r"\s+\d{1,2}:\d{2}(:\d{2})?\s*([AaPp][Mm])?\s*$")
-_ISO_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})")
-_DMY_DATE_RE = re.compile(r"^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$")
-
-
 def normalize_date_to_iso(value) -> str | None:
+    """Normalize a date-like value to SQLite-safe ISO YYYY-MM-DD.
+
+    Handles the common source formats used in the app: ISO dates, day-first
+    dd/mm/yyyy values, and date strings with a trailing time like hh:mm or
+    hh:mm:ss (with or without AM/PM). A value that cannot be parsed is safely
+    ignored by the date filter rather than causing a hard failure.
+    """
     if value is None:
         return None
     s = str(value).strip()
     if not s or s.lower() in ("nan", "none", "nat"):
         return None
-    s = _TIME_SUFFIX_RE.sub("", s).strip()  # drop a trailing HH:MM[:SS] if present
 
-    m = _ISO_DATE_RE.match(s)
-    if m:
-        y, mo, d = (int(x) for x in m.groups())
-        try:
-            return _date(y, mo, d).isoformat()
-        except ValueError:
-            return None
+    # Strip time suffixes in either space-delimited or ISO-with-T forms.
+    s = re.sub(r"[T\s]+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?$", "", s)
 
-    m = _DMY_DATE_RE.match(s)
-    if m:
-        d, mo, y = (int(x) for x in m.groups())  # day-first, per the source format
+    # Common date shapes seen in scraped exports and browser inputs.
+    patterns = [
+        (r"^(\d{4})-(\d{1,2})-(\d{1,2})$", lambda y, mo, d: (_date(int(y), int(mo), int(d)).isoformat())),
+        (r"^(\d{4})/(\d{1,2})/(\d{1,2})$", lambda y, mo, d: (_date(int(y), int(mo), int(d)).isoformat())),
+        (r"^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$", lambda d, mo, y: (_date(int(y), int(mo), int(d)).isoformat())),
+        (r"^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$", lambda y, mo, d: (_date(int(y), int(mo), int(d)).isoformat())),
+    ]
+
+    for pattern, parser in patterns:
+        m = re.match(pattern, s)
+        if not m:
+            continue
         try:
-            return _date(y, mo, d).isoformat()
+            return parser(*m.groups())
         except ValueError:
-            return None
+            continue
 
     return None
 
@@ -113,6 +118,8 @@ def _run_migrations() -> None:
 
     migrations = [
         ("commission_per_physicians", "physician_name", "TEXT NOT NULL DEFAULT ''"),
+        ("matched_records", "user_flagged_mismatch", "INTEGER NOT NULL DEFAULT 0"),
+        ("matched_records", "user_flag_reason", "TEXT DEFAULT NULL"),
     ]
     with get_conn() as conn:
         for table, column, decl in migrations:
@@ -458,11 +465,16 @@ TABLE_DATE_COLUMNS = {
     "commission_per_physicians": "payment_date",
 }
 
+TABLE_PK_COLUMNS = {
+    "abronal_mirror": "row_id",
+    "sot_mirror": "row_id",
+    "matched_records": "match_id",
+    "unmatched_records": "unmatched_id",
+    "commission_per_physicians": "id",
+}
 
-def row_exists(conn: sqlite3.Connection, table: str, predicate: dict[str, object]) -> bool:
-    """Return True if a row already exists using the given equality predicates."""
-    if not predicate:
-        return False
+
+def _predicate_sql(predicate: dict[str, object]) -> tuple[list[str], list]:
     clauses, params = [], []
     for col, value in predicate.items():
         if value is None:
@@ -470,8 +482,28 @@ def row_exists(conn: sqlite3.Connection, table: str, predicate: dict[str, object
         else:
             clauses.append(f'"{col}" = ?')
             params.append(value)
+    return clauses, params
+
+
+def row_exists(conn: sqlite3.Connection, table: str, predicate: dict[str, object]) -> bool:
+    """Return True if a row already exists using the given equality predicates."""
+    if not predicate:
+        return False
+    clauses, params = _predicate_sql(predicate)
     query = f'SELECT 1 FROM "{table}" WHERE {" AND ".join(clauses)} LIMIT 1'
     return conn.execute(query, params).fetchone() is not None
+
+
+def find_row_id(conn: sqlite3.Connection, table: str, predicate: dict[str, object],
+                id_column: str | None = None) -> int | None:
+    """Return the primary key of an existing row matching predicate, or None."""
+    if not predicate:
+        return None
+    pk = id_column or TABLE_PK_COLUMNS.get(table) or table_columns(table)[0]
+    clauses, params = _predicate_sql(predicate)
+    query = f'SELECT "{pk}" FROM "{table}" WHERE {" AND ".join(clauses)} LIMIT 1'
+    row = conn.execute(query, params).fetchone()
+    return row[pk] if row else None
 
 
 def table_columns(table: str) -> list[str]:
@@ -482,7 +514,8 @@ def table_columns(table: str) -> list[str]:
     return [r["name"] for r in rows]
 
 
-def _build_where(filters: dict | None, date_column: str | None = None,
+def _build_where(table: str | None = None, filters: dict | None = None,
+                  date_column: str | None = None,
                   start_date: str | None = None, end_date: str | None = None) -> tuple[str, list]:
     clauses, params = [], []
     if filters:
@@ -495,21 +528,23 @@ def _build_where(filters: dict | None, date_column: str | None = None,
             clauses.append(f'"{col}" LIKE ? ESCAPE \'\\\'')
             escaped = str(val).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params.append(f"%{escaped}%")
-    if date_column and (start_date or end_date):
-        # norm_date() (registered on the connection, see get_conn) turns
-        # whatever shape the source date happens to be in — ISO, or
-        # day-first dd/mm/yyyy with an optional time suffix — into a
-        # plain 'YYYY-MM-DD' string. start_date/end_date come from an
-        # HTML date picker (already 'YYYY-MM-DD'), but are normalized
-        # too in case a caller passes something else; an inclusive
-        # >=/<= range naturally returns every row in the window
-        # regardless of gaps between dates, no special handling needed.
+
+    resolved_date_column = date_column or (TABLE_DATE_COLUMNS.get(table) if table else None)
+    if resolved_date_column and (start_date or end_date):
+        # Use the table's actual payment date column rather than whichever
+        # date-like column happens to be first in a result set. Compare
+        # against normalized ISO dates so the filter works even when
+        # cells are stored as dd/mm/yyyy, dd/mm/yyyy hh:mm, or ISO
+        # strings; inclusive >=/<= continues to match every record in the
+        # requested window, including gaps between dates.
         if start_date:
-            clauses.append(f'norm_date("{date_column}") >= ?')
-            params.append(normalize_date_to_iso(start_date) or start_date)
+            norm_start = normalize_date_to_iso(start_date)
+            clauses.append(f'norm_date("{resolved_date_column}") >= ?')
+            params.append(norm_start or start_date)
         if end_date:
-            clauses.append(f'norm_date("{date_column}") <= ?')
-            params.append(normalize_date_to_iso(end_date) or end_date)
+            norm_end = normalize_date_to_iso(end_date)
+            clauses.append(f'norm_date("{resolved_date_column}") <= ?')
+            params.append(norm_end or end_date)
     if not clauses:
         return "", []
     return " WHERE " + " AND ".join(clauses), params
@@ -542,7 +577,7 @@ def fetch_table(table: str, filters: dict | None = None, limit: int = 1000, offs
                  end_date: str | None = None) -> list[dict]:
     if table not in TABLES:
         raise ValueError(f"Unknown table: {table}")
-    where, params = _build_where(filters, date_column, start_date, end_date)
+    where, params = _build_where(table, filters, date_column, start_date, end_date)
     order_sql = table_default_order(table)
     query = f'SELECT * FROM {table}{where} {order_sql} LIMIT ? OFFSET ?'
     with get_conn() as conn:
@@ -554,7 +589,7 @@ def count_table(table: str, filters: dict | None = None, date_column: str | None
                  start_date: str | None = None, end_date: str | None = None) -> int:
     if table not in TABLES:
         raise ValueError(f"Unknown table: {table}")
-    where, params = _build_where(filters, date_column, start_date, end_date)
+    where, params = _build_where(table, filters, date_column, start_date, end_date)
     with get_conn() as conn:
         row = conn.execute(f"SELECT COUNT(*) AS c FROM {table}{where}", params).fetchone()
     return row["c"] if row else 0

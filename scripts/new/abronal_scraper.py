@@ -22,9 +22,11 @@ load_dotenv(ENV_PATH)
 
 
 class ScraperError(Exception):
+    pass
 
 
 # ── Config ───────────────────────────────────────────────────────
+
 
 def _load_config() -> dict:
     if CONFIG_PATH.exists():
@@ -163,7 +165,7 @@ class AbronalSession:
         # reliable than networkidle: networkidle on a busy server can time out
         # even when the page loaded correctly, and swallowing that timeout means
         # we silently proceed and then hit a confusing "#selRole not found" error
-        # instead of a clean "bad credentials" message.
+        # instead of a clean "bad credentials" message
         try:
             page.wait_for_url("**/Account/LoginAs**", timeout=30_000)
         except PlaywrightTimeout as exc:
@@ -250,6 +252,12 @@ def _should_skip(name: str, skip_names: list[str]) -> bool:
 
 
 def _resolve_one(options: list[Physician], needle: str) -> Physician:
+    """Match a physician option by name with 3-tier fallback (same logic as
+    the working standalone export_physician_performance.py):
+      1. exact match (stripped, case-insensitive, trailing dots ignored)
+      2. starts-with match (only if unique)
+      3. contains match (shortest label wins)
+    Raises ScraperError if nothing matches."""
     needle_l = needle.lower().strip()
 
     exact = [
@@ -282,6 +290,8 @@ def _resolve_targets(options: list[Physician], skip_names: list[str],
 # ── Orchestration ──────────────────────────────────────────────
 
 def run(from_date: str, to_date: str, physicians: list[str] | None = None, log=print) -> ScrapeResult:
+    """Log in to Abronal, export every requested physician's report
+    for [from_date, to_date] straight into data/uploads/abronal/."""
     cfg = ScraperConfig()
     date_range = DateRange.from_iso(from_date, to_date)
     result = ScrapeResult()

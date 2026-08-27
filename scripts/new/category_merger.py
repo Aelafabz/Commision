@@ -57,7 +57,7 @@ class Condensor:
     def list_condensor(self, batch_id: str | None = None) -> list[dict]:
         groups: dict[tuple, dict] = {}
         for row in self.data:
-            date_key = (row["payment_date"] or "")[:10]
+            date_key = dbm.normalize_date_to_iso(row["payment_date"]) or (row["payment_date"] or "")[:10]
             key = (row["physician_id"], row["patient_name"], date_key)
             category = self._category_for(row["service_type"], row["db_category"])
             column = CATEGORY_COLUMN_MAP.get(category, "other")

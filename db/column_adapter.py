@@ -7,6 +7,9 @@ import pandas as pd
 
 
 class ColumnAdapterError(Exception):
+    pass
+
+
 # ── Report-footer boilerplate to strip ────────────────────────────
 # SoT (and some Abronal) exports end with a trailing summary/branding
 # line rather than real data, e.g.:

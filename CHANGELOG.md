@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8 — Date-ordering and duplicate protection for imported data
+
+**Fixed**
+- **Imported lists are now stored in chronological order and duplicates are skipped.** The database layer now checks for an existing matching record before inserting mirrored and matched rows, so repeated imports do not create duplicate entries.
+- **Table ordering is now date-first by default.** Mirror and result tables fetch in chronological order, and `commission_per_physicians` is grouped by physician name before date so a physician's split entries stay together in the expected sequence.
+- **Date filtering remains consistent across the app.** Date comparison uses the normalized payment date and strips trailing time values before comparison, so the range filter works for real source values such as `dd/mm/yyyy hh:mm` and date-only strings.
+
 ## v0.7 — Grouped service categories, CSS reliability fix
 
 **Fixed**

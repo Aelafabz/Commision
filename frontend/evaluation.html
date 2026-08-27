@@ -203,9 +203,7 @@ async function fetchAndRender() {
 
   const start = document.getElementById('startDate').value;
   const end = document.getElementById('endDate').value;
-  const dateCol = currentColumns.find(c => /date/i.test(c));
-  if (dateCol && (start || end)) {
-    params.set('date_column', dateCol);
+  if (start || end) {
     if (start) params.set('start_date', start);
     if (end) params.set('end_date', end);
   }
