@@ -1,4 +1,13 @@
-.env
+*.db
+*.txt
+*.xlsx
+*.env
+*.zip
 *.log
+venv/
+test_db_manager.py
+*.png
 *.pyc
-test_secret_helper.py
+data/scraper_debug/
+temp/
+*.csv
